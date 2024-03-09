@@ -1,4 +1,4 @@
-# SHA256:7IYR4SDBhad3lg6zVcHcEyGXdNb2C0LssG+/3DuSX+JqX2dXo=
+# SHA256:7IYR4SDB1/VcHcEyGXdNb2C0LssG+/3DuSX+JqX2dXo=
 
 class Automake < Formula
   desc "Tool for generating GNU Standards-compliant Makefiles"

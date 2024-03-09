@@ -7,10 +7,12 @@ import hashlib
 import base64
 import random
 import string
+import glob
 
 main_formula_name = input("Formula to add (along with it's dependencies): ")
 
 github_repository = 'manelatun/homebrew-catalina-bottles'
+github_repository_short = github_repository.replace('homebrew-', '')
 github_release_tag = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
 print(f"\nYour GitHub release tag: {github_release_tag}")
@@ -24,6 +26,10 @@ os.makedirs(bottles_path, exist_ok=True)
 
 print("Tapping 'homebrew/core'...")
 subprocess.run(['brew', 'tap', 'homebrew/core', '--force'])
+
+# Remove previous bottles
+for old_bottle in glob.glob(path.join(bottles_path, '*.bottle.*')):
+  os.remove(old_bottle)
 
 # ==================================== #
 
@@ -64,8 +70,14 @@ class File:
 
   def read(self):
     with open(self.path, 'r') as f:
-      return f.read()
+      content = f.read()
+    return content
   
+  def read_first_line(self):
+    with open(self.path, 'r') as f:
+      content = f.readline()
+    return content
+
   def write(self, content):
     with open(self.path, 'w') as f:
       f.write(content)
@@ -93,23 +105,28 @@ for formula in formulas:
 
   # Clean formula
   subprocess.run(['brew', 'uninstall', formula, '--ignore-dependencies'], capture_output=True)
-  subprocess.run(['brew', 'uninstall', f'{github_repository}/{formula}', '--ignore-dependencies'], capture_output=True)
 
   # Check if formula is up-to-date.
-  if path.exists(local_path) and File(local_path).read()[9:53] == source_hash:
-    print(f'{formula} is already up-to-date.')
-    # Install from bottle for dependents.
-    subprocess.run(['brew', 'install', f'{github_repository}/{formula}'])
-    continue
+  if path.exists(local_path):
+    local_hash = File(local_path).read_first_line().replace('# SHA256:', '').strip()
+    if local_hash == source_hash:
+      print(f'{formula} is already up-to-date.')
+      # Install from bottle for dependents.
+      subprocess.run(['brew', 'install', f'{github_repository_short}/{formula}'])
+      continue
 
   # Build bottle
-  build = subprocess.run(['brew', 'install', formula, '--build-bottle', '--ignore-dependencies'])
+  build = subprocess.run(['brew', 'install', formula, '--build-bottle'])
   if build.returncode != 0: exit(1)
 
   # Create bottle
-  bottles = subprocess.run(['brew', 'bottle', formula, '--root-url', f'https://github.com/{github_repository}/releases/download/{github_release_tag}/', '--quiet'], cwd=bottles_path, capture_output=True).stdout
+  bottles = subprocess.run(['brew', 'bottle', formula, '--root-url', f'https://github.com/{github_repository}/releases/download/{github_release_tag}/', '--quiet'], cwd=bottles_path, capture_output=True, text=True).stdout
   bottles_begin, bottles_end = find_bottles(bottles)
   bottles = bottles[bottles_begin:bottles_end]
+
+  # Remove double dash from bottle names
+  for bottle in glob.glob(path.join(bottles_path, '*--*')):
+    os.rename(bottle, bottle.replace('--', '-'))
 
   subprocess.run(['brew', 'postinstall', formula])
 
@@ -121,7 +138,7 @@ for formula in formulas:
   source_content = source_content[:bottles_begin] + bottles + source_content[bottles_end:]
 
   # Swap dependencies to bottles
-  source_content = source_content.replace('depends_on "', f'depends_on "{github_repository}/')
+  source_content = source_content.replace('depends_on "', f'depends_on "{github_repository_short}/')
 
   # Write formula
   File(local_path).write(source_content)
@@ -133,4 +150,3 @@ for formula in formulas:
 formulas.reverse()
 for formula in formulas:
   subprocess.run(['brew', 'uninstall', formula], capture_output=True)
-  subprocess.run(['brew', 'uninstall', f'{github_repository}/{formula}'], capture_output=True)
