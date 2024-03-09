@@ -128,12 +128,11 @@ for formula_name in formulas:
     if local_hash == source_hash:
       print(f"Installing {formula_name} from bottle because it's up-to-date.")
       # Install from bottle for dependents.
-      install_result = subprocess.run(
+      subprocess.run(
         args=['brew', 'install', f'{HOMEBREW_REPOSITORY}/{formula_name}'],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT
       )
-      if install_result.returncode != 0: exit(1)
       continue
 
   # Build bottle
