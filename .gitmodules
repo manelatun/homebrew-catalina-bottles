@@ -1,0 +1,3 @@
+[submodule "homebrew-core"]
+	path = homebrew-core
+	url = https://github.com/homebrew/homebrew-core.git
